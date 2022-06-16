@@ -1,5 +1,7 @@
 bin = bootcard.img
 
+QEMU_FLAGS = -soundhw pcspk
+
 $(bin): bootcard.asm
 	nasm -f bin -o $@ $<
 
@@ -9,11 +11,11 @@ clean:
 
 .PHONY: run
 run: $(bin)
-	qemu-system-i386 -hda $<
+	qemu-system-i386 -hda $< $(QEMU_FLAGS)
 
 .PHONY: debug
 debug: $(bin)
-	qemu-system-i386 -S -s -hda $<
+	qemu-system-i386 -S -s -hda $< $(QEMU_FLAGS)
 
 .PHONY: disasm
 disasm: $(bin)
