@@ -30,7 +30,6 @@ KB_CTRL		equ 61h
 	mov ah, 2
 	int 10h
 %endmacro
-
 %macro spkon 0
 	in al, KB_CTRL
 	or al, 3
@@ -41,6 +40,14 @@ KB_CTRL		equ 61h
 	and al, 0fch
 	out KB_CTRL, al
 %endmacro
+%macro settimer 2
+	mov al, (PIT_CMD_CHAN0 + (%1 << 6)) | PIT_CMD_HILO | PIT_CMD_SQWAVE
+	out PIT_CMD, al
+	mov ax, %2
+	out PIT_DATA0 + %1, al
+	mov al, ah
+	out PIT_DATA0 + %1, al
+%endmacro
 
 	xor ax, ax
 	mov ds, ax
@@ -49,7 +56,10 @@ KB_CTRL		equ 61h
 
 	mov dword [nticks], 0
 	mov dword [muscur], 0
-	call init_spk
+	mov word [32], timer_intr
+	mov word [34], 0
+
+	settimer 0, DIV_ROUND(osc_freq, 250)
 
 	mov ax, 13h
 	int 10h
@@ -73,11 +83,6 @@ KB_CTRL		equ 61h
 infloop:
 	hlt
 	jmp infloop
-
-init_spk:
-	mov word [32], timer_intr
-	mov word [34], 0
-	ret
 
 textout:
 	mov al, [si]
@@ -109,12 +114,7 @@ timer_intr:
 	jz .off
 	mov bx, ax
 
-	mov al, PIT_CMD_CHAN2 | PIT_CMD_HILO | PIT_CMD_SQWAVE
-	out PIT_CMD, al
-	mov ax, bx
-	out PIT_DATA2, al
-	mov al, ah
-	out PIT_DATA2, al
+	settimer 2, bx
 	spkon
 	jmp .eoi
 
