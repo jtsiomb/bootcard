@@ -9,14 +9,13 @@
 data_start	equ 7e00h
 nticks		equ data_start
 muscur		equ nticks + 4
+spkstat		equ muscur + 4
+vol		equ spkstat + 4
 
 osc_freq	equ 1193182
 PIT_DATA0	equ 40h
-PIT_DATA2	equ 42h
 PIT_CMD		equ 43h
 PIT_CMD_CHAN0	equ 00h
-PIT_CMD_CHAN1	equ 40h
-PIT_CMD_CHAN2	equ 80h
 PIT_CMD_HILO	equ 30h
 PIT_CMD_SQWAVE	equ 06h
 KB_CTRL		equ 61h
@@ -49,17 +48,19 @@ KB_CTRL		equ 61h
 	out PIT_DATA0 + %1, al
 %endmacro
 
-	xor ax, ax
+	xor eax, eax
 	mov ds, ax
 	mov ss, ax
 	mov sp, 7c00h
 
-	mov dword [nticks], 0
-	mov dword [muscur], 0
+	mov [nticks], eax
+	mov [muscur], eax
+	;mov [spkstat], eax
+	;mov word [vol], 04h
 	mov word [32], timer_intr
 	mov word [34], 0
 
-	settimer 0, DIV_ROUND(osc_freq, 250)
+	settimer 0, DIV_ROUND(osc_freq, 100)
 
 	mov ax, 13h
 	int 10h
@@ -102,23 +103,40 @@ timer_intr:
 
 	mov bx, [muscur]
 	shl bx, 2
-	mov cx, [music + bx]
+	mov cx, [music + bx]	; event time
 	cmp cx, 0ffffh
 	jz .off
 	cmp ax, cx
-	jb .eoi
+	jb .dopwm
 
 	inc dword [muscur]
-	mov ax, [music + 2 + bx] ; grab timeout
+	mov ax, [music + 2 + bx] ; event counter reload
 	test ax, ax
 	jz .off
 	mov bx, ax
-
 	settimer 2, bx
 	spkon
-	jmp .eoi
+	mov word [spkstat], 1
+	jmp .dopwm
 
 .off:	spkoff
+	mov word [spkstat], 0
+	jmp .eoi
+
+	; PWM for volume control
+.dopwm:	jmp .eoi
+	spkoff
+	mov ax, [spkstat]
+	test ax, ax
+	jz .eoi
+	mov ax, [nticks]
+	and ax, 0fh
+	cmp ax, [vol]
+	jae .pwmoff
+	spkon
+	jmp .eoi
+.pwmoff:
+	spkoff
 
 .eoi:	mov al, 20h
 	out 20h, al	; EOI
@@ -128,14 +146,28 @@ str1:	db 'message message blah',0
 str2:	db 'Michael & Athina',0
 
 music:
-	dw 0, 500
-	dw 10, 0
-	dw 20, 2000
-	dw 30, 0
-	dw 40, 500
-	dw 50, 0
-	dw 60, 2000
-	dw 70, 0
+	dw 0, 2000
+	dw 10, 1900
+	dw 20, 1800
+	dw 30, 1700
+	dw 40, 1600
+	dw 50, 1500
+	dw 60, 1400
+	dw 70, 1300
+	dw 80, 1200
+	dw 90, 1100
+	dw 100, 1000
+	dw 110, 1100
+	dw 120, 1200
+	dw 130, 1300
+	dw 140, 1400
+	dw 150, 1500
+	dw 160, 1600
+	dw 170, 1700
+	dw 180, 1800
+	dw 190, 1900
+	dw 200, 2000
+	dw 210, 0
 	dw 0ffffh, 0
 
 	times 446-($-$$) db 0
