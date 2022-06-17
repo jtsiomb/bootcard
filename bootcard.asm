@@ -7,6 +7,9 @@
 	bits 16
 
 data_start	equ 7e00h
+nticks		equ data_start
+muscur		equ nticks + 4
+
 osc_freq	equ 1193182
 PIT_DATA0	equ 40h
 PIT_DATA2	equ 42h
@@ -44,6 +47,8 @@ KB_CTRL		equ 61h
 	mov ss, ax
 	mov sp, 7c00h
 
+	mov dword [nticks], 0
+	mov dword [muscur], 0
 	call init_spk
 
 	mov ax, 13h
@@ -63,25 +68,15 @@ KB_CTRL		equ 61h
 	mov si, str2
 	call textout
 
+	sti
+
 infloop:
 	hlt
 	jmp infloop
 
 init_spk:
-	xor ax, ax
-	mov [32], ax
-	mov word [34], timer_intr
-
-	mov al, PIT_CMD_CHAN2 | PIT_CMD_HILO | PIT_CMD_SQWAVE
-	out PIT_CMD, al
-	mov ax, DIV_ROUND(osc_freq, 440)
-	out PIT_DATA2, al
-	mov al, ah
-	out PIT_DATA2, al
-
-	spkon
-
-	sti
+	mov word [32], timer_intr
+	mov word [34], 0
 	ret
 
 textout:
@@ -96,13 +91,52 @@ textout:
 .done:	ret
 
 timer_intr:
-	spkoff
-	mov al, 20h
+	mov ax, [nticks]
+	inc ax
+	mov [nticks], ax
+
+	mov bx, [muscur]
+	shl bx, 2
+	mov cx, [music + bx]
+	cmp cx, 0ffffh
+	jz .off
+	cmp ax, cx
+	jb .eoi
+
+	inc dword [muscur]
+	mov ax, [music + 2 + bx] ; grab timeout
+	test ax, ax
+	jz .off
+	mov bx, ax
+
+	mov al, PIT_CMD_CHAN2 | PIT_CMD_HILO | PIT_CMD_SQWAVE
+	out PIT_CMD, al
+	mov ax, bx
+	out PIT_DATA2, al
+	mov al, ah
+	out PIT_DATA2, al
+	spkon
+	jmp .eoi
+
+.off:	spkoff
+
+.eoi:	mov al, 20h
 	out 20h, al	; EOI
 	iret
 
 str1:	db 'message message blah',0
 str2:	db 'Michael & Athina',0
+
+music:
+	dw 0, 500
+	dw 10, 0
+	dw 20, 2000
+	dw 30, 0
+	dw 40, 500
+	dw 50, 0
+	dw 60, 2000
+	dw 70, 0
+	dw 0ffffh, 0
 
 	times 446-($-$$) db 0
 	dd 00212080h
