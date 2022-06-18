@@ -8,9 +8,11 @@
 
 data_start	equ 7e00h
 nticks		equ data_start
-muscur		equ nticks + 4
+tmoffs		equ nticks + 4
+muscur		equ tmoffs + 4
 spkstat		equ muscur + 4
 vol		equ spkstat + 4
+data_end	equ vol + 4
 
 OSC_FREQ	equ 1193182
 PIT_DATA0	equ 40h
@@ -50,12 +52,14 @@ KB_CTRL		equ 61h
 
 	xor eax, eax
 	mov ds, ax
+	mov es, ax
 	mov ss, ax
 	mov sp, 7c00h
 
-	mov [nticks], eax
-	mov [muscur], eax
-	;mov [spkstat], eax
+	mov di, data_start
+	mov cx, (data_end - data_start) / 2
+	rep stosw
+
 	;mov word [vol], 04h
 	mov word [32], timer_intr
 	mov word [34], 0
@@ -102,6 +106,7 @@ timer_intr:
 	inc ax
 	mov [nticks], ax
 
+	sub ax, [tmoffs]
 .pmus:	mov bx, [muscur]
 	shl bx, 2
 	mov cx, [music + bx]	; event time
@@ -146,35 +151,54 @@ timer_intr:
 
 .loop:	neg cx
 	mov [muscur], cx
+	mov ax, [nticks]
+	mov [tmoffs], ax
 	jmp .pmus
 	
 
 str1:	db 'message message blah',0
 str2:	db 'Michael & Athina',0
 
-music:
-	dw 0, 2000
-	dw 10, 1900
-	dw 20, 1800
-	dw 30, 1700
-	dw 40, 1600
-	dw 50, 1500
-	dw 60, 1400
-	dw 70, 1300
-	dw 80, 1200
-	dw 90, 1100
-	dw 100, 1000
-	dw 110, 1100
-	dw 120, 1200
-	dw 130, 1300
-	dw 140, 1400
-	dw 150, 1500
-	dw 160, 1600
-	dw 170, 1700
-	dw 180, 1800
-	dw 190, 1900
-	dw 200, 2000
-	dw 210, 0
+G1	equ 24351
+C2	equ 18243
+D2	equ 16252
+B1	equ 19328
+F2	equ 13666
+E2	equ 14479
+
+%define TM(x)	(40 + (x) * 2)
+
+music:	dw 0, 0
+	dw TM(0),	G1
+	dw TM(40),	C2
+	dw TM(70),	C2
+
+	dw TM(80),	C2
+	dw TM(140),	0
+
+	dw TM(160),	G1
+	dw TM(200),	D2
+	dw TM(230),	B1
+
+	dw TM(240),	C2
+	dw TM(300),	0
+
+	dw TM(320),	G1
+	dw TM(360),	C2
+	dw TM(390),	F2
+
+	dw TM(400),	F2
+	dw TM(440),	E2
+	dw TM(470),	D2
+
+	dw TM(480),	C2
+	dw TM(520),	B1
+	dw TM(550),	C2
+
+	dw TM(560),	D2
+	dw TM(640),	0
+
+	dw TM(680),	0
 	dw 0ffffh, 0
 
 	times 446-($-$$) db 0
