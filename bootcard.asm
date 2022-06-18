@@ -12,7 +12,7 @@ muscur		equ nticks + 4
 spkstat		equ muscur + 4
 vol		equ spkstat + 4
 
-osc_freq	equ 1193182
+OSC_FREQ	equ 1193182
 PIT_DATA0	equ 40h
 PIT_CMD		equ 43h
 PIT_CMD_CHAN0	equ 00h
@@ -60,7 +60,7 @@ KB_CTRL		equ 61h
 	mov word [32], timer_intr
 	mov word [34], 0
 
-	settimer 0, DIV_ROUND(osc_freq, 100)
+	settimer 0, DIV_ROUND(OSC_FREQ, 100)
 
 	mov ax, 13h
 	int 10h
@@ -97,15 +97,16 @@ textout:
 .done:	ret
 
 timer_intr:
+	pusha
 	mov ax, [nticks]
 	inc ax
 	mov [nticks], ax
 
-	mov bx, [muscur]
+.pmus:	mov bx, [muscur]
 	shl bx, 2
 	mov cx, [music + bx]	; event time
 	cmp cx, 0ffffh
-	jz .off
+	jz .loop
 	cmp ax, cx
 	jb .dopwm
 
@@ -140,7 +141,13 @@ timer_intr:
 
 .eoi:	mov al, 20h
 	out 20h, al	; EOI
+	popa
 	iret
+
+.loop:	neg cx
+	mov [muscur], cx
+	jmp .pmus
+	
 
 str1:	db 'message message blah',0
 str2:	db 'Michael & Athina',0
