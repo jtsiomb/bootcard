@@ -70,26 +70,6 @@ start:	xor eax, eax
 	push backbuf_seg
 	pop es
 
-	; setup palette
-	mov cx, 128
-	mov dx, 3c8h
-	mov al, 16
-	out dx, al
-	inc dx
-.cmapsetup:
-	mov al, cl
-	shr al, 2
-	out dx, al
-	neg al
-	and al, 03fh
-	shr al, 1
-	mov ah, al
-	shr al, 2
-	out dx, al
-	mov al, ah
-	out dx, al
-	dec cx
-	jnz .cmapsetup
 	sti
 
 mainloop:
@@ -116,10 +96,10 @@ mainloop:
 	pop es
 	pop ds
 
-	setcursor 10, 12
+	setcursor 10, 0
 	mov si, str1
 	call textout
-	setcursor 12, 13
+	setcursor 12, 1
 	mov si, str2
 	call textout
 
@@ -127,14 +107,14 @@ mainloop:
 
 drawbg:
 	mov bx, 200
-	xor di, di
+	mov di, 5120
 .fillgrad:
 	mov ax, bx
-	add ax, 16
 	mov ah, al
-	mov cx, 320
+	mov cx, 3680	; 20 lines
 	rep stosw
-	dec bx
+	inc bx
+	cmp bx, 208
 	jnz .fillgrad
 	ret
 
@@ -144,7 +124,7 @@ textout:
 	and al, al
 	jz .done
 	mov ah, 0eh
-	mov bx, 0fh
+	mov bx, 82
 	int 10h
 	inc si
 	jmp textout
