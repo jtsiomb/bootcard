@@ -116,6 +116,26 @@ drawbg:
 	inc bx
 	cmp bx, 208
 	jnz .fillgrad
+
+	; mountains
+	mov cx, 320
+	mov bp, sp
+.mnt:	mov [bp - 2], cx
+	fild word [bp - 2]
+	fidiv word [w30]
+	fsincos
+	fiadd word [w5]
+	fimul word [w5]
+	fistp word [bp - 2]
+	fistp word [bp - 4]
+	mov bx, [bp - 2]
+	add bx, 100
+	imul bx, bx, 320
+	add bx, cx
+	mov byte [es:bx], 0
+	dec cx
+	jnz .mnt
+	
 	ret
 
 
@@ -169,7 +189,7 @@ timer_intr:
 	
 
 str1:	db 'message message blah',0
-str2:	db 'Michael & Athina',0
+str2:	db 'Michael & Athena',0
 
 G2	equ 24351/2
 C3	equ 18243/2
@@ -218,6 +238,9 @@ music:	dw 0, 0
 	dd 0820280ch
 	dd 00000800h
 	dd 0001f800h
+
+w5:	dw 5
+w30:	dw 30
 	times 510-($-$$) db 0
 	dw 0aa55h
 
