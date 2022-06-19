@@ -10,9 +10,7 @@ data_start	equ 7e00h
 nticks		equ data_start
 tmoffs		equ nticks + 4
 muscur		equ tmoffs + 4
-spkstat		equ muscur + 4
-vol		equ spkstat + 4
-data_end	equ vol + 4
+data_end	equ muscur + 4
 
 OSC_FREQ	equ 1193182
 PIT_DATA0	equ 40h
@@ -50,7 +48,7 @@ KB_CTRL		equ 61h
 	out PIT_DATA0 + %1, al
 %endmacro
 
-	xor eax, eax
+start:	xor eax, eax
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -60,21 +58,48 @@ KB_CTRL		equ 61h
 	mov cx, (data_end - data_start) / 2
 	rep stosw
 
-	;mov word [vol], 04h
 	mov word [32], timer_intr
-	mov word [34], 0
+	mov [34], ax
 
-	settimer 0, DIV_ROUND(OSC_FREQ, 100)
+	settimer 0, DIV_ROUND(OSC_FREQ, 200)
 
 	mov ax, 13h
 	int 10h
-	mov ax, 0a000h
-	mov es, ax
+	push 0a000h
+	pop es
 
-	mov ax, 0303h
-	mov cx, 32000
+	; setup palette
+	mov cx, 128
+	mov dx, 3c8h
+	mov al, 16
+	out dx, al
+	inc dx
+.cmapsetup:
+	mov al, cl
+	shr al, 2
+	out dx, al
+	neg al
+	and al, 03fh
+	shr al, 1
+	mov ah, al
+	shr al, 2
+	out dx, al
+	mov al, ah
+	out dx, al
+	dec cx
+	jnz .cmapsetup
+	
+drawbg:
+	mov bx, 200
 	xor di, di
+.fillgrad:
+	mov ax, bx
+	add ax, 16
+	mov ah, al
+	mov cx, 320
 	rep stosw
+	dec bx
+	jnz .fillgrad
 
 	setcursor 10, 12
 	mov si, str1
@@ -113,7 +138,7 @@ timer_intr:
 	cmp cx, 0ffffh
 	jz .loop
 	cmp ax, cx
-	jb .dopwm
+	jb .eoi
 
 	inc dword [muscur]
 	mov ax, [music + 2 + bx] ; event counter reload
@@ -122,27 +147,9 @@ timer_intr:
 	mov bx, ax
 	settimer 2, bx
 	spkon
-	mov word [spkstat], 1
-	jmp .dopwm
+	jmp .eoi
 
 .off:	spkoff
-	mov word [spkstat], 0
-	jmp .eoi
-
-	; PWM for volume control
-.dopwm:	jmp .eoi
-	spkoff
-	mov ax, [spkstat]
-	test ax, ax
-	jz .eoi
-	mov ax, [nticks]
-	and ax, 0fh
-	cmp ax, [vol]
-	jae .pwmoff
-	spkon
-	jmp .eoi
-.pwmoff:
-	spkoff
 
 .eoi:	mov al, 20h
 	out 20h, al	; EOI
@@ -159,43 +166,43 @@ timer_intr:
 str1:	db 'message message blah',0
 str2:	db 'Michael & Athina',0
 
-G1	equ 24351
-C2	equ 18243
-D2	equ 16252
-B1	equ 19328
-F2	equ 13666
-E2	equ 14479
+G2	equ 24351/2
+C3	equ 18243/2
+D3	equ 16252/2
+B2	equ 19328/2
+F3	equ 13666/2
+E3	equ 14479/2
 
-%define TM(x)	(40 + (x) * 2)
+%define TM(x)	(40 + (x) * 4)
 
 music:	dw 0, 0
-	dw TM(0),	G1
-	dw TM(40),	C2
-	dw TM(70),	C2
+	dw TM(0),	G2
+	dw TM(40),	C3
+	dw TM(70),	C3
 
-	dw TM(80),	C2
+	dw TM(80),	C3
 	dw TM(140),	0
 
-	dw TM(160),	G1
-	dw TM(200),	D2
-	dw TM(230),	B1
+	dw TM(160),	G2
+	dw TM(200),	D3
+	dw TM(230),	B2
 
-	dw TM(240),	C2
+	dw TM(240),	C3
 	dw TM(300),	0
 
-	dw TM(320),	G1
-	dw TM(360),	C2
-	dw TM(390),	F2
+	dw TM(320),	G2
+	dw TM(360),	C3
+	dw TM(390),	F3
 
-	dw TM(400),	F2
-	dw TM(440),	E2
-	dw TM(470),	D2
+	dw TM(400),	F3
+	dw TM(440),	E3
+	dw TM(470),	D3
 
-	dw TM(480),	C2
-	dw TM(520),	B1
-	dw TM(550),	C2
+	dw TM(480),	C3
+	dw TM(520),	B2
+	dw TM(550),	C3
 
-	dw TM(560),	D2
+	dw TM(560),	D3
 	dw TM(640),	0
 
 	dw TM(680),	0
