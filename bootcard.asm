@@ -12,6 +12,8 @@ tmoffs		equ nticks + 4
 muscur		equ tmoffs + 4
 data_end	equ muscur + 4
 
+backbuf_seg	equ 1000h
+
 OSC_FREQ	equ 1193182
 PIT_DATA0	equ 40h
 PIT_CMD		equ 43h
@@ -65,7 +67,7 @@ start:	xor eax, eax
 
 	mov ax, 13h
 	int 10h
-	push 0a000h
+	push backbuf_seg
 	pop es
 
 	; setup palette
@@ -88,7 +90,41 @@ start:	xor eax, eax
 	out dx, al
 	dec cx
 	jnz .cmapsetup
-	
+	sti
+
+mainloop:
+	call drawbg
+
+	mov dx, 3dah
+.invb:	in al, dx
+	and al, 8
+	jnz mainloop
+.novb:	in al, dx
+	and al, 8
+	jz .novb
+
+	push ds
+	push es
+	push es
+	pop ds
+	push 0a000h
+	pop es
+	xor di, di
+	xor si, si
+	mov cx, 32000
+	rep movsw
+	pop es
+	pop ds
+
+	setcursor 10, 12
+	mov si, str1
+	call textout
+	setcursor 12, 13
+	mov si, str2
+	call textout
+
+	jmp mainloop
+
 drawbg:
 	mov bx, 200
 	xor di, di
@@ -100,19 +136,8 @@ drawbg:
 	rep stosw
 	dec bx
 	jnz .fillgrad
+	ret
 
-	setcursor 10, 12
-	mov si, str1
-	call textout
-	setcursor 12, 13
-	mov si, str2
-	call textout
-
-	sti
-
-infloop:
-	hlt
-	jmp infloop
 
 textout:
 	mov al, [si]
