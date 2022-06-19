@@ -50,7 +50,7 @@ KB_CTRL		equ 61h
 	out PIT_DATA0 + %1, al
 %endmacro
 
-start:	xor eax, eax
+start:	xor ax, ax
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -111,7 +111,7 @@ drawbg:
 .fillgrad:
 	mov ax, bx
 	mov ah, al
-	mov cx, 3680	; 20 lines
+	mov cx, 2400	; 15 lines
 	rep stosw
 	inc bx
 	cmp bx, 208
@@ -127,12 +127,17 @@ drawbg:
 	fiadd word [w5]
 	fimul word [w5]
 	fistp word [bp - 2]
-	fistp word [bp - 4]
+	;fistp word [bp - 4]
 	mov bx, [bp - 2]
 	add bx, 100
 	imul bx, bx, 320
 	add bx, cx
+.mntcol:
 	mov byte [es:bx], 0
+	add bx, 320
+	cmp bx, 64000
+	jb .mntcol
+
 	dec cx
 	jnz .mnt
 	
@@ -165,7 +170,7 @@ timer_intr:
 	cmp ax, cx
 	jb .eoi
 
-	inc dword [muscur]
+	inc word [muscur]
 	mov ax, [music + 2 + bx] ; event counter reload
 	test ax, ax
 	jz .off
