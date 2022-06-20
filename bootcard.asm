@@ -196,12 +196,12 @@ timer_intr:
 str1:	db 'message message blah',0
 str2:	db 'Michael & Athena',0
 
-G2	equ 24351/2
-C3	equ 18243/2
-D3	equ 16252/2
-B2	equ 19328/2
-F3	equ 13666/2
-E3	equ 14479/2
+G2	equ 12175
+C3	equ 9121
+D3	equ 8126
+B2	equ 9664
+F3	equ 6833
+E3	equ 7239
 
 %define TM(x)	(40 + (x) * 4)
 

@@ -20,3 +20,7 @@ debug: $(bin)
 .PHONY: disasm
 disasm: $(bin)
 	ndisasm -o 0x7c00 $< >dis
+
+.PHONY: qr
+qr: bootcard.asm
+	qrencode -o qr.png -r bootcard.asm
