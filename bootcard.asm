@@ -52,24 +52,19 @@ start:	xor ax, ax
 
 	mov ax, 13h
 	int 10h
-	push 1000h
+	push 0a000h
 	pop es
+
+	setcur 10, 0
+	mov si, str1
+	call textout
+	setcur 12, 1
+	mov si, str2
+	call textout
 
 	sti
 
 mainloop:
-	call drawbg
-
-	push ds
-	push es
-	push es
-	pop ds
-	push 0a000h
-	pop es
-	xor di, di
-	xor si, si
-	mov cx, 32000
-
 	mov dx, 3dah
 .invb:	in al, dx
 	and al, 8
@@ -78,16 +73,7 @@ mainloop:
 	and al, 8
 	jz .novb
 
-	rep movsw
-	pop es
-	pop ds
-
-	setcur 10, 0
-	mov si, str1
-	call textout
-	setcur 12, 1
-	mov si, str2
-	call textout
+	call drawbg
 
 	jmp mainloop
 
