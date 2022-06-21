@@ -6,47 +6,33 @@
 	org 7c00h
 	bits 16
 
-data_start	equ 7e00h
-nticks		equ data_start
-tmoffs		equ nticks + 4
-muscur		equ tmoffs + 4
-data_end	equ muscur + 4
+nticks	equ 7e00h
+tmoffs	equ 7e04h
+muscur	equ 7e08h
 
-backbuf_seg	equ 1000h
-
-OSC_FREQ	equ 1193182
-PIT_DATA0	equ 40h
-PIT_CMD		equ 43h
-PIT_CMD_CHAN0	equ 00h
-PIT_CMD_HILO	equ 30h
-PIT_CMD_SQWAVE	equ 06h
-KB_CTRL		equ 61h
-
-%define DIV_ROUND(a, b)	((a) / (b) + ((a) % (b)) / ((b) / 2))
-
-%macro setcursor 2
+%macro setcur 2
 	mov dx, %1 | (%2 << 8)
 	xor bx, bx
 	mov ah, 2
 	int 10h
 %endmacro
 %macro spkon 0
-	in al, KB_CTRL
+	in al, 61h
 	or al, 3
-	out KB_CTRL, al
+	out 61h, al
 %endmacro
 %macro spkoff 0
-	in al, KB_CTRL
+	in al, 61h
 	and al, 0fch
-	out KB_CTRL, al
+	out 61h, al
 %endmacro
-%macro settimer 2
-	mov al, (PIT_CMD_CHAN0 + (%1 << 6)) | PIT_CMD_HILO | PIT_CMD_SQWAVE
-	out PIT_CMD, al
+%macro stimer 2
+	mov al, (%1 << 6) | 36h
+	out 43h, al
 	mov ax, %2
-	out PIT_DATA0 + %1, al
+	out 40h + %1, al
 	mov al, ah
-	out PIT_DATA0 + %1, al
+	out 40h + %1, al
 %endmacro
 
 start:	xor ax, ax
@@ -55,18 +41,18 @@ start:	xor ax, ax
 	mov ss, ax
 	mov sp, 7c00h
 
-	mov di, data_start
-	mov cx, (data_end - data_start) / 2
+	mov di, nticks
+	mov cx, 6
 	rep stosw
 
-	mov word [32], timer_intr
+	mov word [32], tintr
 	mov [34], ax
 
-	settimer 0, DIV_ROUND(OSC_FREQ, 200)
+	stimer 0, 5966
 
 	mov ax, 13h
 	int 10h
-	push backbuf_seg
+	push 1000h
 	pop es
 
 	sti
@@ -96,10 +82,10 @@ mainloop:
 	pop es
 	pop ds
 
-	setcursor 10, 0
+	setcur 10, 0
 	mov si, str1
 	call textout
-	setcursor 12, 1
+	setcur 12, 1
 	mov si, str2
 	call textout
 
@@ -127,7 +113,7 @@ drawbg:
 	fiadd word [w5]
 	fimul word [w5]
 	fistp word [bp - 2]
-	;fistp word [bp - 4]
+	fstp st0
 	mov bx, [bp - 2]
 	add bx, 100
 	imul bx, bx, 320
@@ -155,7 +141,7 @@ textout:
 	jmp textout
 .done:	ret
 
-timer_intr:
+tintr:
 	pusha
 	push ds
 	push word 0
@@ -167,25 +153,25 @@ timer_intr:
 	sub ax, [tmoffs]
 .pmus:	mov bx, [muscur]
 	shl bx, 2
-	mov cx, [music + bx]	; event time
+	mov cx, [music + bx]
 	cmp cx, 0ffffh
 	jz .loop
 	cmp ax, cx
 	jb .eoi
 
 	inc word [muscur]
-	mov ax, [music + 2 + bx] ; event counter reload
+	mov ax, [music + 2 + bx]
 	test ax, ax
 	jz .off
 	mov bx, ax
-	settimer 2, bx
+	stimer 2, bx
 	spkon
 	jmp .eoi
 
 .off:	spkoff
 
 .eoi:	mov al, 20h
-	out 20h, al	; EOI
+	out 20h, al
 	pop ds
 	popa
 	iret
@@ -197,7 +183,7 @@ timer_intr:
 	jmp .pmus
 	
 
-str1:	db 'message message blah',0
+str1:	db 'message blah',0
 str2:	db 'Michael & Athena',0
 
 G2	equ 12175
@@ -207,40 +193,33 @@ B2	equ 9664
 F3	equ 6833
 E3	equ 7239
 
-%define TM(x)	(40 + (x) * 4)
+music:	dw 0,		0
+	dw 40,		G2
+	dw 200,		C3
+	dw 320,		C3
+	dw 360,		C3
+	dw 600,		0
+	dw 680,		G2
+	dw 840,		D3
+	dw 960,		B2
+	dw 1000,	C3
+	dw 1240,	0
+	dw 1320,	G2
+	dw 1480,	C3
+	dw 1600,	F3
+	dw 1640,	F3
+	dw 1800,	E3
+	dw 1920,	D3
+	dw 1960,	C3
+	dw 2120,	B2
+	dw 2240,	C3
+	dw 2280,	D3
+	dw 2600,	0
+	dw 2760,	0
+	dw 0ffffh,	0
 
-music:	dw 0, 0
-	dw TM(0),	G2
-	dw TM(40),	C3
-	dw TM(70),	C3
-
-	dw TM(80),	C3
-	dw TM(140),	0
-
-	dw TM(160),	G2
-	dw TM(200),	D3
-	dw TM(230),	B2
-
-	dw TM(240),	C3
-	dw TM(300),	0
-
-	dw TM(320),	G2
-	dw TM(360),	C3
-	dw TM(390),	F3
-
-	dw TM(400),	F3
-	dw TM(440),	E3
-	dw TM(470),	D3
-
-	dw TM(480),	C3
-	dw TM(520),	B2
-	dw TM(550),	C3
-
-	dw TM(560),	D3
-	dw TM(640),	0
-
-	dw TM(680),	0
-	dw 0ffffh, 0
+w5:	dw 5
+w30:	dw 30
 
 	times 446-($-$$) db 0
 	dd 00212080h
@@ -248,8 +227,6 @@ music:	dw 0, 0
 	dd 00000800h
 	dd 0001f800h
 
-w5:	dw 5
-w30:	dw 30
 	times 510-($-$$) db 0
 	dw 0aa55h
 

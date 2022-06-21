@@ -24,3 +24,7 @@ disasm: $(bin)
 .PHONY: qr
 qr: bootcard.asm
 	qrencode -o qr.png -r bootcard.asm
+
+.PHONY: install
+install: $(bin)
+	dd if=$(bin) of=/dev/sdd bs=512
