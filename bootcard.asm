@@ -25,8 +25,7 @@ KB_CTRL		equ 61h
 %define DIV_ROUND(a, b)	((a) / (b) + ((a) % (b)) / ((b) / 2))
 
 %macro setcursor 2
-	mov dl, %1
-	mov dh, %2
+	mov dx, %1 | (%2 << 8)
 	xor bx, bx
 	mov ah, 2
 	int 10h
@@ -75,14 +74,6 @@ start:	xor ax, ax
 mainloop:
 	call drawbg
 
-	mov dx, 3dah
-.invb:	in al, dx
-	and al, 8
-	jnz mainloop
-.novb:	in al, dx
-	and al, 8
-	jz .novb
-
 	push ds
 	push es
 	push es
@@ -92,6 +83,15 @@ mainloop:
 	xor di, di
 	xor si, si
 	mov cx, 32000
+
+	mov dx, 3dah
+.invb:	in al, dx
+	and al, 8
+	jnz .invb
+.novb:	in al, dx
+	and al, 8
+	jz .novb
+
 	rep movsw
 	pop es
 	pop ds
@@ -157,6 +157,9 @@ textout:
 
 timer_intr:
 	pusha
+	push ds
+	push word 0
+	pop ds
 	mov ax, [nticks]
 	inc ax
 	mov [nticks], ax
@@ -183,6 +186,7 @@ timer_intr:
 
 .eoi:	mov al, 20h
 	out 20h, al	; EOI
+	pop ds
 	popa
 	iret
 
