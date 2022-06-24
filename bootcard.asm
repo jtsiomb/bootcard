@@ -8,7 +8,7 @@
 
 nticks	equ 7e00h
 tmoffs	equ 7e04h
-muscur	equ 7e08h
+musptr	equ 7e08h
 
 %macro setcur 2
 	mov dx, %1 | (%2 << 8)
@@ -129,24 +129,26 @@ textout:
 
 tintr:
 	pusha
-	push ds
-	push word 0
-	pop ds
 	mov ax, [nticks]
 	inc ax
 	mov [nticks], ax
 
+	mov bx, [musptr]
+	cmp bx, 23*3
+	jnz .skiploop
+	xor bx, bx
+	mov [tmoffs], ax
+.skiploop:
+	xor cx, cx
+	mov cl, [music + bx]
+	shl cx, 4
 	sub ax, [tmoffs]
-.pmus:	mov bx, [muscur]
-	shl bx, 2
-	mov cx, [music + bx]
-	cmp cx, 0ffffh
-	jz .loop
 	cmp ax, cx
 	jb .eoi
 
-	inc word [muscur]
-	mov ax, [music + 2 + bx]
+	mov ax, [music + 1 + bx]
+	add bx, 3
+	mov [musptr], bx
 	test ax, ax
 	jz .off
 	mov bx, ax
@@ -158,51 +160,16 @@ tintr:
 
 .eoi:	mov al, 20h
 	out 20h, al
-	pop ds
 	popa
 	iret
-
-.loop:	neg cx
-	mov [muscur], cx
-	mov ax, [nticks]
-	mov [tmoffs], ax
-	jmp .pmus
-	
 
 str1:	db 'message blah',0
 str2:	db 'Michael & Athena',0
 
-G2	equ 12175
-C3	equ 9121
-D3	equ 8126
-B2	equ 9664
-F3	equ 6833
-E3	equ 7239
-
-music:	dw 0,		0
-	dw 40,		G2
-	dw 200,		C3
-	dw 320,		C3
-	dw 360,		C3
-	dw 600,		0
-	dw 680,		G2
-	dw 840,		D3
-	dw 960,		B2
-	dw 1000,	C3
-	dw 1240,	0
-	dw 1320,	G2
-	dw 1480,	C3
-	dw 1600,	F3
-	dw 1640,	F3
-	dw 1800,	E3
-	dw 1920,	D3
-	dw 1960,	C3
-	dw 2120,	B2
-	dw 2240,	C3
-	dw 2280,	D3
-	dw 2600,	0
-	dw 2760,	0
-	dw 0ffffh,	0
+music:	dd 0a2f8f00h, 0a11123a1h, 23a11423h, 28000023h, 0be322f8fh, 25c0391fh
+	dd 4b23a13ch, 8f500000h, 23a15a2fh, 641ab161h, 476e1ab1h, 1fbe751ch
+	dd 8223a178h, 0a18925c0h, 1fbe8c23h, 0aa0000a0h
+	dw 0
 
 w5:	dw 5
 w30:	dw 30
