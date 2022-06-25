@@ -9,6 +9,7 @@
 nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
+ppos	equ 7e0ch
 
 %macro setcur 2
 	mov dx, %1 | (%2 << 8)
@@ -42,7 +43,7 @@ start:	xor ax, ax
 	mov sp, 7c00h
 
 	mov di, nticks
-	mov cx, 6
+	mov cx, 8
 	rep stosw
 
 	mov word [32], tintr
@@ -74,6 +75,8 @@ mainloop:
 	jz .novb
 
 	call drawbg
+
+	call psys
 
 	jmp mainloop
 
@@ -115,6 +118,28 @@ drawbg:
 	
 	ret
 
+psys:	cmp word [ppos + 2], 0
+	ja .skipspawn
+
+	call rnd
+	add ax, 128
+	mov [ppos + 2], ax
+	call rnd
+	add ax, 32
+	mov [ppos], ax
+.skipspawn:
+	dec word [ppos + 2]
+	mov ax, [ppos + 2]
+	shr ax, 2
+	imul bx, ax, 320
+	add bx, [ppos]
+	mov byte [es:bx], 0eh
+
+rnd:	in al, 40h
+	mov ah, al
+	in al, 40h
+	shr ax, 8
+	ret
 
 textout:
 	mov al, [si]
