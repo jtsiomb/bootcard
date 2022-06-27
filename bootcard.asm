@@ -9,7 +9,8 @@
 nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
-ppos	equ 7e0ch
+frame	equ 7e0ch
+fval	equ 7e10h
 
 %macro setcur 2
 	mov dx, %1 | (%2 << 8)
@@ -74,12 +75,6 @@ mainloop:
 	and al, 8
 	jz .novb
 
-	call drawbg
-
-	call psys
-
-	jmp mainloop
-
 drawbg:
 	mov bx, 200
 	mov di, 5120
@@ -115,25 +110,34 @@ drawbg:
 
 	dec cx
 	jnz .mnt
-	
-	ret
+	;ret
 
-psys:	cmp word [ppos + 2], 0
-	ja .skipspawn
+refl:	mov di, 150 * 320
+	mov si, di
+	mov dx, 50
+	fldz
+.rloop:	fld st0
+	fiadd word [frame]
+	fidiv word [w30]
+	fsincos
+	fistp word [fval]
+	fstp st0
+	fld1
+	fadd
 
-	call rnd
-	add ax, 128
-	mov [ppos + 2], ax
-	call rnd
-	add ax, 32
-	mov [ppos], ax
-.skipspawn:
-	dec word [ppos + 2]
-	mov ax, [ppos + 2]
-	shr ax, 2
-	imul bx, ax, 320
-	add bx, [ppos]
-	mov byte [es:bx], 0eh
+	mov ax, [fval]
+	;add ax, 2
+	imul ax, ax, 320
+	sub si, ax
+
+	mov cx, 160
+	rep movsw
+	sub si, 640
+	dec dx
+	jnz .rloop
+
+	inc word [frame]
+	jmp mainloop
 
 rnd:	in al, 40h
 	mov ah, al
@@ -199,11 +203,11 @@ music:	dd 0a2f8f00h, 0a11123a1h, 23a11423h, 28000023h, 0be322f8fh, 25c0391fh
 w5:	dw 5
 w30:	dw 30
 
-	times 446-($-$$) db 0
-	dd 00212080h
-	dd 0820280ch
-	dd 00000800h
-	dd 0001f800h
+	;times 446-($-$$) db 0
+	;dd 00212080h
+	;dd 0820280ch
+	;dd 00000800h
+	;dd 0001f800h
 
 	times 510-($-$$) db 0
 	dw 0aa55h
