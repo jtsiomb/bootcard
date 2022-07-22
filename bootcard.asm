@@ -6,10 +6,16 @@
 	org 7c00h
 	bits 16
 
+barh	equ 4
+nbars	equ 11
+barstart equ 200 - (nbars+1) * barh
+
 nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
-ppos	equ 7e0ch
+frame	equ 7e0ch
+fval	equ 7e10h
+cmap	equ 7e14h
 
 %macro setcur 2
 	mov dx, %1 | (%2 << 8)
@@ -56,11 +62,19 @@ start:	xor ax, ax
 	push 0a000h
 	pop es
 
-	setcur 10, 0
+	
+	mov al, 16
+	mov di, barstart * 320
+	mov bx, nbars
+.drawbars:
+	mov cx, barh * 320
+	rep stosb
+	inc al
+	dec bx
+	jnz .drawbars
+
+	setcur 12, 16
 	mov si, str1
-	call textout
-	setcur 12, 1
-	mov si, str2
 	call textout
 
 	sti
@@ -74,15 +88,9 @@ mainloop:
 	and al, 8
 	jz .novb
 
-	call drawbg
-
-	call psys
-
-	jmp mainloop
-
 drawbg:
 	mov bx, 200
-	mov di, 5120
+	xor di, di
 .fillgrad:
 	mov ax, bx
 	mov ah, al
@@ -104,42 +112,23 @@ drawbg:
 	fistp word [bp - 2]
 	fstp st0
 	mov bx, [bp - 2]
-	add bx, 100
+	add bx, 84
 	imul bx, bx, 320
 	add bx, cx
 .mntcol:
 	mov byte [es:bx], 0
 	add bx, 320
-	cmp bx, 64000
+	cmp bx, 128 * 320
 	jb .mntcol
 
 	dec cx
 	jnz .mnt
-	
-	ret
 
-psys:	cmp word [ppos + 2], 0
-	ja .skipspawn
+	test word [nticks], 0fh
+	jnz mainloop
+	call fadecol
 
-	call rnd
-	add ax, 128
-	mov [ppos + 2], ax
-	call rnd
-	add ax, 32
-	mov [ppos], ax
-.skipspawn:
-	dec word [ppos + 2]
-	mov ax, [ppos + 2]
-	shr ax, 2
-	imul bx, ax, 320
-	add bx, [ppos]
-	mov byte [es:bx], 0eh
-
-rnd:	in al, 40h
-	mov ah, al
-	in al, 40h
-	shr ax, 8
-	ret
+	jmp mainloop
 
 textout:
 	mov al, [si]
@@ -151,6 +140,34 @@ textout:
 	inc si
 	jmp textout
 .done:	ret
+
+fadecol:
+	push es
+	push word 0
+	pop es
+	mov ax, 16
+	mov dx, 3c7h
+	out dx, al
+	add dx, 2
+	mov cx, 16 * 3
+	mov di, cmap
+	rep insb
+	pop es
+	dec dx
+	out dx, al
+	inc dx
+	mov cx, 16 * 3
+	mov si, cmap
+.fadeloop:
+	lodsb
+	test al, al
+	jz .skipdec
+	dec al
+.skipdec:
+	out dx, al
+	dec cx
+	jnz .fadeloop
+	ret
 
 tintr:
 	pusha
@@ -177,6 +194,18 @@ tintr:
 	test ax, ax
 	jz .off
 	mov bx, ax
+
+	mov dx, 3c8h
+	shr ax, 9
+	add ax, 3
+	out dx, al
+	inc dx
+	mov al, 3fh
+	out dx, al
+	mov al, 2fh
+	out dx, al
+	out dx, al
+
 	stimer 2, bx
 	spkon
 	jmp .eoi
@@ -188,8 +217,7 @@ tintr:
 	popa
 	iret
 
-str1:	db 'message blah',0
-str2:	db 'Michael & Athena',0
+str1:	db 'Michael ',3,' Athena',0
 
 music:	dd 0a2f8f00h, 0a11123a1h, 23a11423h, 28000023h, 0be322f8fh, 25c0391fh
 	dd 4b23a13ch, 8f500000h, 23a15a2fh, 641ab161h, 476e1ab1h, 1fbe751ch
