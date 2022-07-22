@@ -49,9 +49,10 @@ start:	xor ax, ax
 	mov sp, 7c00h
 
 	mov di, nticks
-	mov cx, 8
+	mov cx, 16
 	rep stosw
 
+	cli
 	mov word [32], tintr
 	mov [34], ax
 
@@ -124,9 +125,14 @@ drawbg:
 	dec cx
 	jnz .mnt
 
-	test word [nticks], 0fh
-	jnz mainloop
-	call fadecol
+	; upd colormap
+	mov dx, 3c8h
+	mov al, 16
+	out dx, al
+	inc dx
+	mov si, cmap
+	mov cx, 16 * 3
+	rep outsb
 
 	jmp mainloop
 
@@ -141,33 +147,6 @@ textout:
 	jmp textout
 .done:	ret
 
-fadecol:
-	push es
-	push word 0
-	pop es
-	mov ax, 16
-	mov dx, 3c7h
-	out dx, al
-	add dx, 2
-	mov cx, 16 * 3
-	mov di, cmap
-	rep insb
-	pop es
-	dec dx
-	out dx, al
-	inc dx
-	mov cx, 16 * 3
-	mov si, cmap
-.fadeloop:
-	lodsb
-	test al, al
-	jz .skipdec
-	dec al
-.skipdec:
-	out dx, al
-	dec cx
-	jnz .fadeloop
-	ret
 
 tintr:
 	pusha
@@ -176,7 +155,7 @@ tintr:
 	mov [nticks], ax
 
 	mov bx, [musptr]
-	cmp bx, 23*3
+	cmp bx, 22*3
 	jnz .skiploop
 	xor bx, bx
 	mov [tmoffs], ax
@@ -186,32 +165,42 @@ tintr:
 	shl cx, 4
 	sub ax, [tmoffs]
 	cmp ax, cx
-	jb .eoi
+	jb .end
 
 	mov ax, [music + 1 + bx]
 	add bx, 3
 	mov [musptr], bx
 	test ax, ax
 	jz .off
+
 	mov bx, ax
+	shr bx, 9
+	sub bx, 13
+	imul bx, bx, 3
+	mov byte [cmap + bx], 3fh
+	mov word [cmap + bx + 1], 2f2fh
 
-	mov dx, 3c8h
-	shr ax, 9
-	add ax, 3
-	out dx, al
-	inc dx
-	mov al, 3fh
-	out dx, al
-	mov al, 2fh
-	out dx, al
-	out dx, al
-
+	mov bx, ax
 	stimer 2, bx
 	spkon
-	jmp .eoi
+	jmp .end
 
 .off:	spkoff
 
+.end:	test word [nticks], 1
+	jnz .eoi
+	mov cx, 16 * 3
+	mov si, cmap
+.fadecol:
+	lodsb
+	test al, al
+	jz .skipdec
+	dec al
+	mov [si-1], al
+.skipdec:
+	dec cx
+	jnz .fadecol
+	
 .eoi:	mov al, 20h
 	out 20h, al
 	popa
