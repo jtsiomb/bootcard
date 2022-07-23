@@ -1,14 +1,13 @@
-; ---- boot me! ----
+; boot me!
 ; nasm -f bin -o bootcard.img bootcard.asm
 ; cat bootcard.img >/dev/<usbstick>
-; reboot
 
 	org 7c00h
 	bits 16
 
 barh	equ 4
 nbars	equ 11
-barstart equ 200 - (nbars+1) * barh
+barstart equ 152
 
 nticks	equ 7e00h
 tmoffs	equ 7e04h
@@ -17,12 +16,6 @@ frame	equ 7e0ch
 fval	equ 7e10h
 cmap	equ 7e14h
 
-%macro setcur 2
-	mov dx, %1 | (%2 << 8)
-	xor bx, bx
-	mov ah, 2
-	int 10h
-%endmacro
 %macro spkon 0
 	in al, 61h
 	or al, 3
@@ -63,7 +56,6 @@ start:	xor ax, ax
 	push 0a000h
 	pop es
 
-	
 	mov al, 16
 	mov di, barstart * 320
 	mov bx, nbars
@@ -74,10 +66,20 @@ start:	xor ax, ax
 	dec bx
 	jnz .drawbars
 
-	setcur 12, 16
+	mov dx, 100ch
+	xor bx, bx
+	mov ah, 2
+	int 10h
 	mov si, str1
-	call textout
-
+.txout:	mov al, [si]
+	and al, al
+	jz .txdone
+	mov ah, 0eh
+	mov bx, 82
+	int 10h
+	inc si
+	jmp .txout
+.txdone:
 	sti
 
 mainloop:
@@ -125,7 +127,7 @@ drawbg:
 	dec cx
 	jnz .mnt
 
-	; upd colormap
+	; upd pal
 	mov dx, 3c8h
 	mov al, 16
 	out dx, al
@@ -135,18 +137,6 @@ drawbg:
 	rep outsb
 
 	jmp mainloop
-
-textout:
-	mov al, [si]
-	and al, al
-	jz .done
-	mov ah, 0eh
-	mov bx, 82
-	int 10h
-	inc si
-	jmp textout
-.done:	ret
-
 
 tintr:
 	pusha
@@ -224,5 +214,3 @@ w30:	dw 30
 
 	times 510-($-$$) db 0
 	dw 0aa55h
-
-; vi:ft=nasm ts=8 sts=8 sw=8:
