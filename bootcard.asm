@@ -1,31 +1,15 @@
 ; boot me!
-; nasm -f bin -o bootcard.img bootcard.asm
-; cat bootcard.img >/dev/<usbstick>
+; nasm -f bin -o foo.img foo.asm
+; cat foo.img >/dev/<usbstick>
 
 	org 7c00h
 	bits 16
 
-barh	equ 4
-nbars	equ 11
-barstart equ 152
-
 nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
-frame	equ 7e0ch
-fval	equ 7e10h
 cmap	equ 7e14h
 
-%macro spkon 0
-	in al, 61h
-	or al, 3
-	out 61h, al
-%endmacro
-%macro spkoff 0
-	in al, 61h
-	and al, 0fch
-	out 61h, al
-%endmacro
 %macro stimer 2
 	mov al, (%1 << 6) | 36h
 	out 43h, al
@@ -48,7 +32,6 @@ start:	xor ax, ax
 	cli
 	mov word [32], tintr
 	mov [34], ax
-
 	stimer 0, 5966
 
 	mov ax, 13h
@@ -57,14 +40,14 @@ start:	xor ax, ax
 	pop es
 
 	mov al, 16
-	mov di, barstart * 320
-	mov bx, nbars
-.drawbars:
-	mov cx, barh * 320
+	mov di, 48640
+	mov bx, 11
+.bars:
+	mov cx, 1280
 	rep stosb
 	inc al
 	dec bx
-	jnz .drawbars
+	jnz .bars
 
 	mov dx, 100ch
 	xor bx, bx
@@ -73,13 +56,13 @@ start:	xor ax, ax
 	mov si, str1
 .txout:	mov al, [si]
 	and al, al
-	jz .txdone
+	jz .done
 	mov ah, 0eh
 	mov bx, 82
 	int 10h
 	inc si
 	jmp .txout
-.txdone:
+.done:
 	sti
 
 mainloop:
@@ -97,13 +80,12 @@ drawbg:
 .fillgrad:
 	mov ax, bx
 	mov ah, al
-	mov cx, 2400	; 15 lines
+	mov cx, 2400
 	rep stosw
 	inc bx
 	cmp bx, 208
 	jnz .fillgrad
 
-	; mountains
 	mov cx, 320
 	mov bp, sp
 .mnt:	mov [bp - 2], cx
@@ -127,7 +109,6 @@ drawbg:
 	dec cx
 	jnz .mnt
 
-	; upd pal
 	mov dx, 3c8h
 	mov al, 16
 	out dx, al
@@ -172,10 +153,14 @@ tintr:
 
 	mov bx, ax
 	stimer 2, bx
-	spkon
+	in al, 61h
+	or al, 3
+	out 61h, al
 	jmp .end
 
-.off:	spkoff
+.off:	in al, 61h
+	and al, 0fch
+	out 61h, al
 
 .end:	test word [nticks], 1
 	jnz .eoi
