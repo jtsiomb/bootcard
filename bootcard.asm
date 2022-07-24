@@ -1,7 +1,6 @@
 ; ---- boot me! ----
 ; nasm -f bin -o bootcard.img bootcard.asm
 ; cat bootcard.img >/dev/<usbstick>
-; reboot
 
 	org 7c00h
 	bits 16
@@ -95,7 +94,7 @@ drawbg:
 .fillgrad:
 	mov ax, bx
 	mov ah, al
-	mov cx, 2400	; 15 lines
+	mov cx, 2400 ; 15 lines
 	rep stosw
 	inc bx
 	cmp bx, 208
@@ -224,5 +223,4 @@ w30:	dw 30
 
 	times 510-($-$$) db 0
 	dw 0aa55h
-
 ; vi:ft=nasm ts=8 sts=8 sw=8:
