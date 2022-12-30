@@ -2,19 +2,40 @@
 ; nasm -f bin -o bootcard.img bootcard.asm
 ; cat bootcard.img >/dev/<usbstick>
 
-	org 7c00h
+%define MIDI
+
 	bits 16
+%ifdef DOS
+	org 100h
+	jmp start
+%else
+	org 7c00h
+%endif
 
 barh	equ 4
 nbars	equ 11
 barstart equ 200 - (nbars+1) * barh
 
+%ifdef DOS
+nticks 	dd 0
+tmoffs 	dd 0
+musptr 	dd 0
+frame 	dd 0
+pnote	dd 0
+fval 	dd 0
+cmap 	dd 0
+
+saved_tintr_offs dw 0
+saved_tintr_seg dw 0
+%else
 nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
 frame	equ 7e0ch
+pnote	equ 7e18h
 fval	equ 7e10h
 cmap	equ 7e14h
+%endif
 
 %macro setcur 2
 	mov dx, %1 | (%2 << 8)
@@ -41,7 +62,9 @@ cmap	equ 7e14h
 	out 40h + %1, al
 %endmacro
 
-start:	xor ax, ax
+start:
+%ifndef DOS
+	xor ax, ax
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -54,9 +77,29 @@ start:	xor ax, ax
 	cli
 	mov word [32], tintr
 	mov [34], ax
+%else
+	; for DOS save the previous interrupt handler to restore at the end
+	xor ax, ax
+	mov es, ax
+	mov ax, [es:32]
+	mov [saved_tintr_offs], ax
+	mov ax, [es:34]
+	mov [saved_tintr_seg], ax
+
+	cli
+	mov ax, ds
+	mov word [es:32], tintr
+	mov [es:34], ax
+%endif
 
 	stimer 0, 5966
-
+%ifdef MIDI
+	call resetmidi
+	mov ax, 0c0h	; change program on chan 0
+	call sendmidi
+	mov ax, 19	; church organ
+	call sendmidi
+%endif
 	mov ax, 13h
 	int 10h
 	push 0a000h
@@ -133,7 +176,27 @@ drawbg:
 	mov cx, 16 * 3
 	rep outsb
 
+%ifdef DOS
+	in al, 60h
+	dec al
+	jnz mainloop
+
+	mov ax, 3
+	int 10h
+
+	cli
+	xor ax, ax
+	mov es, ax
+	mov ax, [saved_tintr_offs]
+	mov word [es:32], ax
+	mov ax, [saved_tintr_seg]
+	mov [es:34], ax
+	stimer 0, 0xffff
+	sti
+	ret
+%else
 	jmp mainloop
+%endif
 
 textout:
 	mov al, [si]
@@ -146,6 +209,61 @@ textout:
 	jmp textout
 .done:	ret
 
+%ifdef MIDI
+note_on:
+	mov [pnote], ax
+	mov ax, 90h	; note-on command for channel 0
+	call sendmidi
+	mov ax, [pnote]
+	call sendmidi
+	mov ax, 127
+	call sendmidi
+	ret
+
+note_off:
+	mov ax, 80h	; note-off command for channel 0
+	call sendmidi
+	mov ax, [pnote]
+	call sendmidi
+	mov ax, 64
+	call sendmidi
+	ret
+
+all_notes_off:
+	mov ax, 0b0h	; channel mode message for channel 0...
+	call sendmidi
+	mov ax, 7bh	; all notes off
+	call sendmidi
+	xor ax, ax
+	call sendmidi
+	ret
+
+waitmidi:
+	mov ax, 331h
+.wait:	in al, dx	; read status port
+	test al, 40h	; test output-ready bit (0: ready)
+	jnz .wait
+	ret
+
+sendmidi:
+	push dx
+	push ax
+	call waitmidi
+	pop ax
+	dec dx
+	out dx, al
+	pop dx
+	ret
+
+resetmidi:
+	call waitmidi
+	mov ax, 0ffh	; reset command
+	out dx, al
+	call waitmidi
+	mov ax, 3fh	; enter UART mode
+	out dx, al
+	ret
+%endif	; MIDI
 
 tintr:
 	pusha
@@ -154,7 +272,11 @@ tintr:
 	mov [nticks], ax
 
 	mov bx, [musptr]
+%ifdef MIDI
+	cmp bx, 22*2
+%else
 	cmp bx, 22*3
+%endif
 	jnz .skiploop
 	xor bx, bx
 	mov [tmoffs], ax
@@ -166,25 +288,45 @@ tintr:
 	cmp ax, cx
 	jb .end
 
+%ifdef MIDI
+	call note_off
+	mov al, [music + 1 + bx]
+	xor ah, ah
+	add bx, 2
+%else
 	mov ax, [music + 1 + bx]
 	add bx, 3
+%endif
 	mov [musptr], bx
 	test ax, ax
 	jz .off
 
 	mov bx, ax
+%ifdef MIDI
+	sub bx, 43
+%else
 	shr bx, 9
 	sub bx, 13
+%endif
 	imul bx, bx, 3
 	mov byte [cmap + bx], 3fh
 	mov word [cmap + bx + 1], 2f2fh
 
+%ifdef MIDI
+	call note_on
+%else
 	mov bx, ax
 	stimer 2, bx
 	spkon
+%endif
 	jmp .end
 
-.off:	spkoff
+.off:
+%ifdef MIDI
+	call all_notes_off
+%else
+	spkoff
+%endif
 
 .end:	test word [nticks], 1
 	jnz .eoi
@@ -207,20 +349,71 @@ tintr:
 
 str1:	db 'Michael ',3,' Athena',0
 
-music:	dd 0a2f8f00h, 0a11123a1h, 23a11423h, 28000023h, 0be322f8fh, 25c0391fh
-	dd 4b23a13ch, 8f500000h, 23a15a2fh, 641ab161h, 476e1ab1h, 1fbe751ch
-	dd 8223a178h, 0a18925c0h, 1fbe8c23h, 0aa0000a0h
-	dw 0
+%ifdef MIDI
+G2	equ 43
+C3	equ 48
+D3	equ 50
+B2	equ 47
+F3	equ 53
+E3	equ 52
+%else
+G2      equ 12175
+C3      equ 9121
+D3      equ 8126
+B2      equ 9664
+F3      equ 6833
+E3      equ 7239
+%endif
+
+
+%ifdef MIDI
+%macro EV 2
+	db %1 >> 4
+	db %2
+%endmacro
+%else
+%macro EV 2
+	db %1 >> 4
+	dw %2
+%endmacro
+%endif
+
+music:	EV     0,  G2
+	EV   160,  C3
+	EV   272,  C3
+	EV   320,  C3
+	EV   560,  0
+	EV   640,  G2
+	EV   800,  D3
+	EV   912,  B2
+	EV   960,  C3
+	EV  1200,  0
+	EV  1280,  G2
+	EV  1440,  C3
+	EV  1552,  F3
+	EV  1600,  F3
+	EV  1760,  E3
+	EV  1872,  D3
+	EV  1920,  C3
+	EV  2080,  B2
+	EV  2192,  C3
+	EV  2240,  D3
+	EV  2560,  0
+	EV  2720,  0
 
 w5:	dw 5
 w30:	dw 30
 
+%ifndef DOS
+%ifndef MIDI
 	times 446-($-$$) db 0
 	dd 00212080h
 	dd 0820280ch
 	dd 00000800h
 	dd 0001f800h
+%endif
 
 	times 510-($-$$) db 0
 	dw 0aa55h
+%endif
 ; vi:ft=nasm ts=8 sts=8 sw=8:

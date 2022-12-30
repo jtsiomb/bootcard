@@ -1,13 +1,17 @@
 bin = bootcard.img
+com = bootcard.com
 
-QEMU_FLAGS = -soundhw pcspk
+QEMU_FLAGS = -soundhw pcspk -device sb16
 
 $(bin): bootcard.asm
 	nasm -f bin -o $@ $<
 
+$(com): bootcard.asm
+	nasm -f bin -o $@ $< -DDOS
+
 .PHONY: clean
 clean:
-	rm -f $(bin)
+	rm -f $(bin) $(com)
 
 .PHONY: run
 run: $(bin)
@@ -28,3 +32,10 @@ qr: bootcard.asm
 .PHONY: install
 install: $(bin)
 	dd if=$(bin) of=/dev/sdd bs=512
+
+.PHONY: com
+com: $(com)
+
+.PHONY: rundos
+rundos: $(com)
+	dosbox-x $(com)
