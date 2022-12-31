@@ -15,6 +15,8 @@ Hardware requirements:
   - PC with "legacy boot" (BIOS) support.
   - 386 or higher CPU with an FPU (386+x87, 486 DX, or anything newer).
   - PC-speaker for sound (otherwise it runs silent).
+  - Optional: MIDI synthesizer with MPU-401 or compatible (UART mode) MIDI
+    interface. See "Instructions" below.
 
 The main constraint for this project was that the source code should fit in
 a QR code, which means it should be no more than about 3kb. This in turn makes
@@ -51,3 +53,11 @@ Instructions
      "legacy boot" enabled.
 
   4. Enjoy!
+
+### MIDI option
+
+If you wish to build this for MIDI output instead of using the PC-speaker,
+uncomment the `%define MIDI` line at the top of `bootcard.asm` before running
+`make`. You will need a MIDI synthesizer connected to an MPU-401 or compatible
+(UART mode) MIDI interface. If your MIDI interface is not configured to respond
+to port 330h, search and replace "331h" to your MIDI I/O base port+1.
