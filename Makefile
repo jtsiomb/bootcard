@@ -39,3 +39,6 @@ com: $(com)
 .PHONY: rundos
 rundos: $(com)
 	dosbox-x $(com)
+
+tools/gentune: tools/gentune.c
+	$(CC) -o $@ $< $(LDFLAGS)

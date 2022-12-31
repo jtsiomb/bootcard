@@ -201,13 +201,14 @@ drawbg:
 textout:
 	mov al, [si]
 	and al, al
-	jz .done
+	jz textout_done
 	mov ah, 0eh
 	mov bx, 82
 	int 10h
 	inc si
 	jmp textout
-.done:	ret
+textout_done:
+	ret
 
 %ifdef MIDI
 note_on:
@@ -217,17 +218,18 @@ note_on:
 	mov ax, [pnote]
 	call sendmidi
 	mov ax, 127
-	call sendmidi
-	ret
+	jmp sendmidi
 
 note_off:
+	mov ax, [pnote]
+	test ax, ax
+	jz textout_done
 	mov ax, 80h	; note-off command for channel 0
 	call sendmidi
 	mov ax, [pnote]
 	call sendmidi
 	mov ax, 64
-	call sendmidi
-	ret
+	jmp sendmidi
 
 all_notes_off:
 	mov ax, 0b0h	; channel mode message for channel 0...
@@ -235,11 +237,11 @@ all_notes_off:
 	mov ax, 7bh	; all notes off
 	call sendmidi
 	xor ax, ax
-	call sendmidi
-	ret
+	mov [pnote], ax
+	jmp sendmidi
 
 waitmidi:
-	mov ax, 331h
+	mov dx, 331h
 .wait:	in al, dx	; read status port
 	test al, 40h	; test output-ready bit (0: ready)
 	jnz .wait
@@ -289,7 +291,6 @@ tintr:
 	jb .end
 
 %ifdef MIDI
-	call note_off
 	mov al, [music + 1 + bx]
 	xor ah, ah
 	add bx, 2
@@ -313,6 +314,10 @@ tintr:
 	mov word [cmap + bx + 1], 2f2fh
 
 %ifdef MIDI
+	push ax
+	;call note_off
+	call all_notes_off
+	pop ax
 	call note_on
 %else
 	mov bx, ax
