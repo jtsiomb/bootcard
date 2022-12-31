@@ -2,7 +2,9 @@
 ; nasm -f bin -o bootcard.img bootcard.asm
 ; cat bootcard.img >/dev/<usbstick>
 
-%define MIDI
+; uncomment the next line to output MIDI messages to port 330h (MPU-401 or 
+; UART-mode MPU-401 compatible MIDI interface), instead of using the PC speaker
+;%define MIDI
 
 	bits 16
 %ifdef DOS
