@@ -21,7 +21,6 @@ nticks 	dd 0
 tmoffs 	dd 0
 musptr 	dd 0
 frame 	dd 0
-pnote	dd 0
 fval 	dd 0
 cmap 	dd 0
 
@@ -32,7 +31,6 @@ nticks	equ 7e00h
 tmoffs	equ 7e04h
 musptr	equ 7e08h
 frame	equ 7e0ch
-pnote	equ 7e18h
 fval	equ 7e10h
 cmap	equ 7e14h
 %endif
@@ -70,10 +68,6 @@ start:
 	mov ss, ax
 	mov sp, 7c00h
 
-	mov di, nticks
-	mov cx, 16
-	rep stosw
-
 	cli
 	mov word [32], tintr
 	mov [34], ax
@@ -91,6 +85,10 @@ start:
 	mov word [es:32], tintr
 	mov [es:34], ax
 %endif
+
+	mov di, nticks
+	mov cx, 16
+	rep stosw
 
 	stimer 0, 5966
 %ifdef MIDI
@@ -212,23 +210,12 @@ textout_done:
 
 %ifdef MIDI
 note_on:
-	mov [pnote], ax
+	push ax
 	mov ax, 90h	; note-on command for channel 0
 	call sendmidi
-	mov ax, [pnote]
+	pop ax
 	call sendmidi
 	mov ax, 127
-	jmp sendmidi
-
-note_off:
-	mov ax, [pnote]
-	test ax, ax
-	jz textout_done
-	mov ax, 80h	; note-off command for channel 0
-	call sendmidi
-	mov ax, [pnote]
-	call sendmidi
-	mov ax, 64
 	jmp sendmidi
 
 all_notes_off:
@@ -237,7 +224,6 @@ all_notes_off:
 	mov ax, 7bh	; all notes off
 	call sendmidi
 	xor ax, ax
-	mov [pnote], ax
 	jmp sendmidi
 
 waitmidi:
@@ -315,7 +301,6 @@ tintr:
 
 %ifdef MIDI
 	push ax
-	;call note_off
 	call all_notes_off
 	pop ax
 	call note_on
